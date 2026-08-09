@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: cms-lab-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cms
+      POSTGRES_PASSWORD: cms
+      POSTGRES_DB: cms_lab
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cms -d cms_lab"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
