@@ -11,7 +11,8 @@
     "start": "node dist/server.js",
     "test": "vitest run",
     "check:contentful": "tsx src/scripts/check-contentful.ts",
-    "migrate": "tsx src/scripts/migrate.ts"
+    "migrate": "tsx src/scripts/migrate.ts",
+    "db:migrate": "tsx src/db/migrate.ts"
   },
   "keywords": [],
   "author": "",
