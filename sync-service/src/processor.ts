@@ -2,6 +2,7 @@ import { cda } from "./contentful.js";
 import { mapEntry } from "./mapper/index.js";
 import { MappingError } from "./mapper/types.js";
 import { upsertEntry, unpublishEntry, deleteEntry, recordFailure } from "./store.js";
+import { count, publishLagMs } from "./observability.js";
 
 export type SyncEvent = {
     entryId: string;
@@ -12,6 +13,18 @@ export type SyncEvent = {
 const MAX_ATTEMPTS = 3;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Every log line carries this shape, so entryId/contentType/revision/outcome/lagMs are always present. */
+function fields(ev: SyncEvent, outcome: string, extra: Record<string, unknown> = {}) {
+    return {
+        entryId: ev.entryId,
+        contentType: ev.contentType,
+        revision: null as number | null,
+        outcome,
+        lagMs: null as number | null,
+        ...extra,
+    };
+}
+
 export async function processEvent(ev: SyncEvent, log: any): Promise<void> {
     const action = ev.topic.split(".").pop(); // publish | unpublish | delete | ...
 
@@ -19,12 +32,14 @@ export async function processEvent(ev: SyncEvent, log: any): Promise<void> {
         try {
             if (action === "unpublish" || action === "archive") {
                 await unpublishEntry(ev.entryId);
-                log.info({ entryId: ev.entryId, action }, "entry unpublished");
+                count("unpublished", ev.contentType ?? "unknown");
+                log.info(fields(ev, "unpublished"), "entry unpublished");
                 return;
             }
             if (action === "delete") {
                 await deleteEntry(ev.entryId);
-                log.info({ entryId: ev.entryId, action }, "entry deleted");
+                count("deleted", ev.contentType ?? "unknown");
+                log.info(fields(ev, "deleted"), "entry deleted");
                 return;
             }
 
@@ -33,14 +48,14 @@ export async function processEvent(ev: SyncEvent, log: any): Promise<void> {
             const mapped = mapEntry(entry);
             const applied = await upsertEntry(mapped);
 
-            const lagMs = mapped.publishedAt
-                ? Date.now() - new Date(mapped.publishedAt).getTime()
-                : null;
+            const lagMs = publishLagMs(mapped.publishedAt);
+            const outcome = applied ? "synced" : "stale_ignored";
+            count(outcome, mapped.contentType);
 
             log.info(
                 {
                     entryId: mapped.entryId, contentType: mapped.contentType,
-                    revision: mapped.revision, applied, lagMs
+                    revision: mapped.revision, outcome, lagMs, attempt
                 },
                 applied ? "entry synced" : "stale event ignored",
             );
@@ -48,23 +63,27 @@ export async function processEvent(ev: SyncEvent, log: any): Promise<void> {
         } catch (err: any) {
             // A mapping error will never succeed on retry — dead-letter immediately.
             if (err instanceof MappingError) {
-                log.error({ entryId: ev.entryId, err: err.message }, "mapping failed");
+                count("mapping_failed", ev.contentType ?? "unknown");
+                log.error(fields(ev, "mapping_failed", { err: err.message }), "mapping failed");
                 await recordFailure(ev.entryId, ev.contentType, ev.topic, err.message, ev, attempt);
                 return;
             }
             // 404 = not published yet / already gone. Not retryable.
             if (err?.sys?.id === "NotFound" || err?.name === "NotFound") {
-                log.warn({ entryId: ev.entryId }, "entry not found in CDA; treating as unpublished");
+                count("not_found", ev.contentType ?? "unknown");
+                log.warn(fields(ev, "not_found"), "entry not found in CDA; treating as unpublished");
                 await unpublishEntry(ev.entryId);
                 return;
             }
             if (attempt === MAX_ATTEMPTS) {
-                log.error({ entryId: ev.entryId, attempt, err: err.message }, "sync failed, dead-lettering");
+                count("dead_lettered", ev.contentType ?? "unknown");
+                log.error(fields(ev, "dead_lettered", { attempt, err: err.message }), "sync failed, dead-lettering");
                 await recordFailure(ev.entryId, ev.contentType, ev.topic, err.message, ev, attempt);
                 return;
             }
             const backoff = 250 * 2 ** (attempt - 1);
-            log.warn({ entryId: ev.entryId, attempt, backoff }, "transient failure, retrying");
+            count("retried", ev.contentType ?? "unknown");
+            log.warn(fields(ev, "retried", { attempt, backoff }), "transient failure, retrying");
             await sleep(backoff);
         }
     }

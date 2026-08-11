@@ -42,3 +42,15 @@ export async function recordFailure(
         [entryId, contentType, topic, attempts, error, payload],
     );
 }
+
+export async function listFailures(limit = 50) {
+    const { rows } = await pool.query(
+        `select id, entry_id, content_type, topic, attempts, error, failed_at
+       from sync_failures order by failed_at desc limit $1`, [limit],
+    );
+    return rows;
+}
+
+export async function clearFailure(id: number) {
+    await pool.query(`delete from sync_failures where id = $1`, [id]);
+}

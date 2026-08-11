@@ -47,11 +47,11 @@ function fromDelivery(a: any): Article {
     };
 }
 
-export async function listArticles(isPreview = false): Promise<Article[]> {
+export async function listArticles(isPreview = false, tag?: string): Promise<Article[]> {
     if (SOURCE === "contentful" || isPreview) {
         return (await cf.getArticles(isPreview)).map(fromContentful);
     }
-    return (await own.getArticles()).map(fromDelivery);
+    return (await own.getArticles(tag)).map(fromDelivery);
 }
 
 export async function findArticle(slug: string, isPreview = false): Promise<Article | null> {

@@ -14,7 +14,16 @@
     "migrate": "tsx src/scripts/migrate.ts",
     "db:migrate": "tsx src/db/migrate.ts",
     "backfill": "tsx src/scripts/backfill.ts",
-    "reconcile": "tsx src/scripts/reconcile.ts"
+    "reconcile": "tsx src/scripts/reconcile.ts",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:psql": "docker compose exec postgres psql -U cms -d cms_lab",
+    "sync": "pnpm --filter sync-service dev",
+    "web": "pnpm --filter web dev",
+    "check": "pnpm --filter sync-service check:contentful",
+    "replay": "pnpm --filter sync-service replay",
+    "dlq": "tsx src/scripts/drain-dlq.ts",
+    "dlq:list": "tsx -e \"import('./src/store.js').then(async m => { console.table(await m.listFailures()); process.exit(0) })\""
   },
   "keywords": [],
   "author": "",

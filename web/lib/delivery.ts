@@ -6,8 +6,9 @@ async function get<T>(path: string): Promise<T> {
     return res.json();
 }
 
-export async function getArticles() {
-    const { items } = await get<{ items: any[] }>("/content/articles");
+export async function getArticles(tag?: string) {
+    const qs = tag ? `?tag=${encodeURIComponent(tag)}` : "";
+    const { items } = await get<{ items: any[] }>(`/content/articles${qs}`);
     return items;
 }
 

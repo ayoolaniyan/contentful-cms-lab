@@ -22,6 +22,7 @@ function mapArticle(e: any): Record<string, unknown> {
     if (!f.title || !f.slug) {
         throw new MappingError("article missing title or slug", e.sys?.id);
     }
+
     return {
         title: f.title,
         slug: f.slug,
@@ -72,7 +73,9 @@ export function mapEntry(entry: any): InternalEntry {
         entryId,
         contentType,
         revision: entry.sys.revision ?? 0,
-        publishedAt: entry.sys.publishedAt ?? null,
+        // The Delivery API never returns sys.publishedAt (only the Management API does) —
+        // updatedAt is the closest signal CDA gives us for when this version went live.
+        publishedAt: entry.sys.updatedAt ?? null,
         data: fn(entry),
     };
 }
