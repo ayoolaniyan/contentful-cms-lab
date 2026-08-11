@@ -2,8 +2,11 @@ import Fastify from "fastify";
 import { config } from "./config.js";
 import { pool } from "./db.js";
 import { processEvent, type SyncEvent } from "./processor.js";
+import { registerDeliveryRoutes } from "./delivery.js";
 
 const app = Fastify({ logger: { transport: { target: "pino-pretty" } } });
+
+await registerDeliveryRoutes(app);
 
 app.get("/health", async () => {
     const { rows } = await pool.query("select 1 as ok");

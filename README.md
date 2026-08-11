@@ -25,3 +25,8 @@ In the Contentful web app, model three content types with deliberate complexity:
 Webhooks for latency, reconciliation for correctness, one mapper for both.
 Reconciliation ran on a schedule — a Cloud Scheduler job hitting a Cloud Run job every few minutes in GCP terms, or a Kubernetes CronJob. Webhooks gave sub-second freshness; the sweep was the safety net, and its lag budget was minutes, not seconds. The token is persisted, so each run only fetches deltas — cheap enough to run often without hammering the API
 
+## Block 5 — Own delivery API + frontend flip
+Add GET /content/articles and GET /content/articles/:slug serving from Postgres. Flip the Next.js data layer from the Contentful SDK to your API — ideally behind the same fetch interface so the components don't change at all.
+- What owning the store bought: availability independence from Contentful's API; cross-source querying and filtering in SQL; a delivery contract we control, so a CMS swap doesn't break consumers; and full control of caching and invalidation.
+- What it cost: eventual consistency (publish-to-visible lag, which is measured in Block 3); a store to operate and back up; a sync path that can drift, needing reconciliation; and drafts must bypass it entirely via the Preview API.
+- When you'd skip it: greenfield with a single content source and no existing store — pull-through with CDN caching and webhook-triggered invalidation is dramatically less machinery, and you build the sync only when you need multi-source queries or provenance-independent delivery.
