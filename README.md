@@ -20,3 +20,8 @@ In the Contentful web app, model three content types with deliberate complexity:
 - Postgres schema: content_entries(entry_id pk, content_type, version, status, data jsonb, source, updated_at) plus a sync_failures table (DLQ).
 - POST /webhooks/contentful.
 - The processor: fetch the entry fresh from the CDA, run it through a mapper module.
+
+## Block 4 — Backfill + reconciliation
+Webhooks for latency, reconciliation for correctness, one mapper for both.
+Reconciliation ran on a schedule — a Cloud Scheduler job hitting a Cloud Run job every few minutes in GCP terms, or a Kubernetes CronJob. Webhooks gave sub-second freshness; the sweep was the safety net, and its lag budget was minutes, not seconds. The token is persisted, so each run only fetches deltas — cheap enough to run often without hammering the API
+

@@ -25,3 +25,9 @@ create table if not exists sync_failures (
   payload       jsonb,
   failed_at     timestamptz not null default now()
 );
+
+create table if not exists sync_state (
+  id              text primary key,
+  next_sync_token text,
+  last_run_at     timestamptz
+);
